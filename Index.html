@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แอปคำนวณค่าขนส่ง</title>
+    <!-- โหลด Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Tahoma', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#10b981', // Emerald 500
+                        'secondary': '#f97316', // Orange 600
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* สไตล์พื้นฐานเพื่อให้ดูดี */
+        body {
+            background-color: #f3f4f6; /* Gray 100 */
+        }
+        /* กำหนดขนาดและความสูงของ Modal */
+        #oil-price-modal-content {
+            max-width: 360px; /* ให้กว้างกว่า iframe เล็กน้อย */
+            max-height: 80vh; /* จำกัดความสูงของ modal */
+            overflow-y: auto; /* ให้ scroll ได้ถ้าเนื้อหายาวเกิน */
+        }
+    </style>
+</head>
+<body class="font-sans min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- ปุ่มสำหรับเปิด Modal ราคาน้ำมัน -->
+    <div class="max-w-xl w-full flex flex-col items-center">
+        <button id="open-oil-price-modal" onclick="toggleOilPriceModal()"
+                class="mb-4 bg-secondary hover:bg-orange-700 text-white font-bold py-2 px-6 rounded-full shadow-lg transform transition duration-200 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-secondary focus:ring-opacity-50 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2a5 5 0 00-5 5v3a2 2 0 012 2h6a2 2 0 012-2V7a5 5 0 00-5-5zM2 10a2 2 0 012-2h12a2 2 0 012 2v3a2 2 0 002 2h1a1 1 0 110 2H1a1 1 0 110-2h1a2 2 0 002-2v-3z"></path>
+            </svg>
+            ราคาน้ำมันวันนี้ (Bangchak)
+        </button>
+
+        <!-- Main Application Card -->
+        <div class="w-full max-w-xl bg-white shadow-2xl rounded-xl p-8 space-y-6">
+
+            <h1 class="text-3xl font-extrabold text-gray-800 text-center border-b-4 border-primary pb-3 mb-6">
+                แอปคำนวณค่าขนส่ง
+            </h1>
+            
+            <!-- ส่วนของฟอร์ม -->
+            <div class="space-y-5">
+                <!-- กรอกระยะทาง -->
+                <div>
+                    <label for="distance" class="block text-sm font-medium text-gray-700 mb-1">
+                        กรอกระยะทาง (กม.)
+                    </label>
+                    <input type="number" id="distance" min="1" value="100" step="1"
+                           class="mt-1 block w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary transition duration-150"
+                           placeholder="เช่น 100">
+                </div>
+
+                <!-- เลือกประเภทรถ -->
+                <div>
+                    <label for="vehicle_type" class="block text-sm font-medium text-gray-700 mb-1">
+                        เลือกประเภทรถ
+                    </label>
+                    <select id="vehicle_type"
+                            class="mt-1 block w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm bg-white focus:border-primary focus:ring-primary appearance-none transition duration-150">
+                        <!-- Options จะถูกสร้างโดย JavaScript -->
+                    </select>
+                </div>
+                
+                <!-- กรอก/ตรวจสอบ ราคาน้ำมัน -->
+                <div>
+                    <label for="fuel_price" class="block text-sm font-medium text-gray-700 mb-1 flex justify-between items-center">
+                        ราคาน้ำมันดีเซล B7 ต่อลิตร (บาท)
+                        <!-- Icon: Loading or Check -->
+                        <span id="price-status" class="text-xs text-gray-500 flex items-center">
+                            <svg id="loading-icon" class="animate-spin -ml-1 mr-1 h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            กำลังดึงราคาล่าสุด...
+                        </span>
+                    </label>
+                    <input type="number" id="fuel_price" min="0" value="29.94" step="0.01"
+                           class="mt-1 block w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary transition duration-150"
+                           placeholder="เช่น 30.50">
+                    <p id="fuel-price-note" class="text-xs text-gray-500 mt-1">
+                        ราคานี้จะถูกใช้ในการคำนวณ หากคุณต้องการใช้ราคาอื่น โปรดแก้ไข
+                    </p>
+                </div>
+
+                <!-- ปุ่มคำนวณ -->
+                <button onclick="calculateCost()"
+                        class="w-full bg-primary hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg transform transition duration-200 ease-in-out hover:scale-[1.01] focus:outline-none focus:ring-4 focus:ring-primary focus:ring-opacity-50">
+                    คำนวณค่าขนส่ง
+                </button>
+            </div>
+
+            <!-- ส่วนของผลลัพธ์ -->
+            <div id="results" class="mt-8 pt-6 border-t border-gray-200 hidden">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">
+                    ผลการคำนวณ
+                </h2>
+                <div id="result-content" class="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <!-- ผลลัพธ์จะแสดงที่นี่ -->
+                </div>
+            </div>
+
+            <!-- LLM Feature Section -->
+            <div id="llm-feature" class="mt-8 pt-6 border-t border-gray-200 hidden">
+                <button id="generate-quote-btn" onclick="generateQuoteDraft()"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transform transition duration-200 ease-in-out hover:scale-[1.01] focus:outline-none focus:ring-4 focus:ring-indigo-600 focus:ring-opacity-50 flex items-center justify-center">
+                    <span class="mr-2">✨</span> สร้างร่างใบเสนอราคาสำหรับลูกค้า
+                </button>
+                <div id="quote-output" class="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-200 hidden">
+                    <h3 class="font-semibold text-lg text-purple-800 mb-2">ร่างใบเสนอราคา:</h3>
+                    <p id="quote-text" class="whitespace-pre-wrap text-gray-700"></p>
+                    <button onclick="copyToClipboard('quote-text', this)" class="mt-3 text-xs bg-purple-200 hover:bg-purple-300 text-purple-800 font-medium py-1 px-3 rounded transition">คัดลอก</button>
+                </div>
+                <div id="quote-loading" class="hidden text-center mt-4 text-indigo-600 flex items-center justify-center">
+                    <svg class="animate-spin h-5 w-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    กำลังสร้างร่างใบเสนอราคาด้วย Gemini...
+                </div>
+            </div>
+
+            <!-- กล่องข้อความแจ้งเตือน/ข้อผิดพลาด -->
+            <div id="error-box" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                <strong class="font-bold">เกิดข้อผิดพลาด:</strong>
+                <span id="error-message" class="block sm:inline"></span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Overlay สำหรับแสดง iframe ราคาน้ำมัน -->
+    <div id="oil-price-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center z-50">
+        <!-- Modal Content Container -->
+        <div id="oil-price-modal-content" class="bg-white rounded-lg shadow-2xl p-4 relative">
+            <button onclick="toggleOilPriceModal()" class="absolute top-2 right-2 text-gray-700 hover:text-gray-900 p-1 rounded-full bg-gray-100 hover:bg-gray-200 transition">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+            <h3 class="text-lg font-bold text-gray-800 mb-3 border-b pb-2">ราคาน้ำมันวันนี้ (Bangchak)</h3>
+            <iframe width="320" height="600" src="https://oil-price.bangchak.co.th/BcpOilPrice1/en" frameborder="0"></iframe>
+            <p class="text-xs text-gray-500 mt-2 text-center">ข้อมูลจาก: Bangchak Petroleum</p>
+        </div>
+    </div>
+
+    <script>
+        // กำหนดราคาน้ำมันสำรอง (Fallback) หากดึงข้อมูลไม่ได้
+        const FALLBACK_PRICE = 29.94; 
+        const MAX_RETRIES = 5;
+        
+        // ข้อมูลต้นทุน
+        const costData = {
+            "4W": { fixed: 1820.00, efficiency: 10, repair: 1.00 },
+            "4WJ": { fixed: 2003.44, efficiency: 8.2, repair: 1.50 },
+            "6W": { fixed: 2894.14, efficiency: 6, repair: 2.00 },
+            "10W": { fixed: 3405.64, efficiency: 4, repair: 2.40 },
+            ">10W": { fixed: 5604.09, efficiency: 3.5, repair: 2.80 }
+        };
+
+        // Global variables to store the last successful calculation for the LLM feature
+        let lastCalculatedCost = 0;
+        let lastCalculatedDistance = 0;
+        let lastCalculatedVehicle = '';
+
+        const distanceInput = document.getElementById('distance');
+        const vehicleSelect = document.getElementById('vehicle_type');
+        const fuelPriceInput = document.getElementById('fuel_price');
+        const fuelPriceNote = document.getElementById('fuel-price-note');
+        const priceStatus = document.getElementById('price-status');
+        const oilPriceModal = document.getElementById('oil-price-modal'); 
+        const resultsDiv = document.getElementById('results');
+        const resultContentDiv = document.getElementById('result-content');
+        const errorBox = document.getElementById('error-box');
+        const errorMessageSpan = document.getElementById('error-message');
+        
+        async function fetchWithRetry(url, payload, retries = 0) {
+            const delay = Math.pow(2, retries) * 1000;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (response.status === 429 && retries < MAX_RETRIES) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return fetchWithRetry(url, payload, retries + 1);
+                }
+                if (!response.ok) {
+                    throw new Error(`API call failed with status: ${response.status}`);
+                }
+                return response;
+            } catch (error) {
+                if (retries < MAX_RETRIES) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return fetchWithRetry(url, payload, retries + 1);
+                }
+                throw error;
+            }
+        }
+        
+        function toggleOilPriceModal() {
+            oilPriceModal.classList.toggle('hidden');
+        }
+
+        function showError(message) {
+            errorMessageSpan.textContent = message;
+            errorBox.classList.remove('hidden');
+            resultsDiv.classList.add('hidden');
+            document.getElementById('llm-feature').classList.add('hidden');
+        }
+
+        function hideError() {
+            errorBox.classList.add('hidden');
+        }
+
+        function initializeVehicleOptions() {
+            for (const vehicle in costData) {
+                const option = document.createElement('option');
+                option.value = vehicle;
+                option.textContent = vehicle;
+                vehicleSelect.appendChild(option);
+            }
+        }
+        
+        function getFixedCostMultiplier(distance) {
+            if (distance > 2000) return 4.0;
+            if (distance > 1600) return 3.0;
+            if (distance > 1175) return 2.0;
+            if (distance > 800) return 1.5;
+            return 1.0;
+        }
+        
+        function roundDistanceToNearest25(distance) {
+            if (distance <= 0) return 25;
+            const unit = 25;
+            return Math.ceil(distance / unit) * unit;
+        }
+
+        async function fetchFuelPrice(retry = 0) {
+            priceStatus.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-1 h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                กำลังดึงราคาล่าสุด...
+            `;
+            fuelPriceNote.textContent = 'กำลังดึงราคาน้ำมันดีเซล B7 ล่าสุด...';
+
+            const systemPrompt = "Act as a data extractor. Search for the latest price of PTT Diesel B7 (บาท/ลิตร) in Thailand and respond ONLY with the number (e.g., '29.94'). If unable to find, respond with 'ERROR'.";
+            const userQuery = "latest PTT Diesel B7 price";
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                tools: [{ "google_search": {} }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            try {
+                const response = await fetchWithRetry(apiUrl, payload, retry);
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (text && text.toUpperCase() !== 'ERROR') {
+                    const priceMatch = text.match(/(\d+\.\d+|\d+)/); 
+                    let price = null;
+                    if (priceMatch) price = parseFloat(priceMatch[0]);
+                    
+                    if (!isNaN(price) && price > 0) {
+                        fuelPriceInput.value = price.toFixed(2);
+                        priceStatus.innerHTML = `
+                            <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            ราคาล่าสุด
+                        `;
+                        fuelPriceNote.textContent = `ราคาน้ำมันล่าสุด: ${price.toFixed(2)} บาท/ลิตร (ดึงข้อมูลอัตโนมัติ)`;
+                        return;
+                    }
+                }
+                throw new Error('Failed to parse fuel price from API response.');
+            } catch (error) {
+                console.error("Error fetching fuel price:", error);
+                fuelPriceInput.value = FALLBACK_PRICE.toFixed(2);
+                priceStatus.innerHTML = `
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    ใช้ราคาสำรอง
+                `;
+                fuelPriceNote.textContent = `ไม่สามารถดึงราคาน้ำมันล่าสุดได้ (ใช้ราคาสำรอง: ${FALLBACK_PRICE.toFixed(2)} บาท/ลิตร)`;
+            }
+        }
+        
+        function calculateCost() {
+            hideError();
+            resultsDiv.classList.add('hidden');
+            document.getElementById('llm-feature').classList.add('hidden'); 
+
+            const inputDistance = parseFloat(distanceInput.value); 
+            const vehicleType = vehicleSelect.value;
+            const currentFuelPrice = parseFloat(fuelPriceInput.value); 
+
+            if (isNaN(inputDistance) || inputDistance <= 0) {
+                showError("กรุณากรอกระยะทางที่ถูกต้อง (ต้องเป็นตัวเลขมากกว่า 0)");
+                return;
+            }
+            if (!vehicleType || !costData[vehicleType]) {
+                showError("กรุณาเลือกประเภทรถที่ถูกต้อง");
+                return;
+            }
+            if (isNaN(currentFuelPrice) || currentFuelPrice <= 0) {
+                showError("กรุณากรอกราคาน้ำมันที่ถูกต้อง (ต้องเป็นตัวเลขมากกว่า 0)");
+                return;
+            }
+
+            const roundedDistance = roundDistanceToNearest25(inputDistance);
+            const data = costData[vehicleType];
+            
+            const fixedCostMultiplier = getFixedCostMultiplier(roundedDistance);
+            const originalFixedCost = data.fixed;
+            const adjustedFixedCost = originalFixedCost * fixedCostMultiplier;
+            const fuelCost = (roundedDistance / data.efficiency) * currentFuelPrice;
+            const repairCost = roundedDistance * data.repair;
+            const totalCostBeforeRounding = adjustedFixedCost + fuelCost + repairCost;
+            const totalCost = Math.round(totalCostBeforeRounding / 10) * 10;
+            
+            lastCalculatedCost = totalCost;
+            lastCalculatedDistance = roundedDistance;
+            lastCalculatedVehicle = vehicleType;
+
+            displayResults(vehicleType, inputDistance, roundedDistance, originalFixedCost, fixedCostMultiplier, adjustedFixedCost, fuelCost, repairCost, totalCostBeforeRounding, totalCost, currentFuelPrice);
+            document.getElementById('llm-feature').classList.remove('hidden');
+        }
+
+        function displayResults(vehicleType, inputDistance, roundedDistance, originalFixedCost, multiplier, adjustedFixedCost, fuelCost, repairCost, totalCostBeforeRounding, totalCost, fuelPriceUsed) {
+            resultsDiv.classList.remove('hidden');
+            document.getElementById('quote-output').classList.add('hidden');
+            document.getElementById('quote-text').textContent = '';
+
+            const content = `
+                <p class="text-lg font-bold text-secondary mb-3">ผลลัพธ์สำหรับ: ${vehicleType}</p>
+                
+                <div class="flex justify-between items-center py-2 border-b border-gray-100 bg-blue-50/50 px-3 rounded-lg">
+                    <span class="text-gray-600 font-bold">ราคาน้ำมันที่ใช้คำนวณ:</span>
+                    <span class="text-blue-800 font-extrabold">${fuelPriceUsed.toFixed(2).toLocaleString('th-TH')} บาท/ลิตร</span>
+                </div>
+
+                <div class="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg mb-4 mt-3">
+                    <p class="text-lg font-bold text-yellow-800">
+                        ระยะทางที่ใช้คำนวณ: 
+                        <span class="text-xl">${roundedDistance.toLocaleString('th-TH')} กม.</span>
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        (จากระยะทางที่กรอก ${inputDistance.toLocaleString('th-TH')} กม. ซึ่งถูกปัดขึ้นเป็นทวีคูณของ 25 กม.)
+                    </p>
+                </div>
+                
+                <div class="flex justify-between items-center py-2 border-b-2 border-primary bg-primary/10 rounded-lg px-3">
+                    <span class="text-gray-800 font-bold">ค่าใช้จ่ายคงที่รวม:</span>
+                    <span class="text-primary font-extrabold">${adjustedFixedCost.toFixed(2).toLocaleString('th-TH')} บาท</span>
+                </div>
+                
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span class="text-gray-600">ค่าน้ำมัน (Fuel Cost):</span>
+                    <span class="text-gray-800 font-medium">${fuelCost.toFixed(2).toLocaleString('th-TH')} บาท</span>
+                </div>
+                
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span class="text-gray-600">ค่าซ่อมบำรุง/ค่าสึกหรอ (Repair Cost):</span>
+                    <span class="text-gray-800 font-medium">${repairCost.toFixed(2).toLocaleString('th-TH')} บาท</span>
+                </div>
+
+                <div class="flex justify-between items-center py-2 border-b border-gray-100 mt-2">
+                    <span class="text-gray-500 text-sm italic">รวมก่อนปัดเศษ (Unrounded Total):</span>
+                    <span class="text-gray-500 text-sm font-medium">${totalCostBeforeRounding.toFixed(2).toLocaleString('th-TH')} บาท</span>
+                </div>
+
+                <div class="flex justify-between items-center pt-3 border-t-2 border-gray-400 mt-3">
+                    <span class="text-xl font-bold text-gray-800">รวมค่าใช้จ่ายทั้งหมด :</span>
+                    <span class="text-2xl font-extrabold text-primary">${totalCost.toFixed(2).toLocaleString('th-TH')} บาท</span>
+                </div>
+            `;
+            resultContentDiv.innerHTML = content;
+        }
+
+        async function generateQuoteDraft() {
+            const quoteOutputDiv = document.getElementById('quote-output');
+            const quoteTextEl = document.getElementById('quote-text');
+            const quoteLoadingEl = document.getElementById('quote-loading');
+
+            quoteOutputDiv.classList.add('hidden');
+            quoteLoadingEl.classList.remove('hidden');
+
+            const cost = lastCalculatedCost.toFixed(2);
+            const distance = lastCalculatedDistance;
+            const vehicle = lastCalculatedVehicle;
+
+            if (lastCalculatedCost === 0 || lastCalculatedDistance === 0 || lastCalculatedVehicle === '') {
+                quoteLoadingEl.classList.add('hidden');
+                showError("กรุณาคำนวณค่าขนส่งก่อน เพื่อให้ Gemini สร้างใบเสนอราคา");
+                return;
+            }
+
+            const systemPrompt = `You are a professional logistics assistant. Your task is to draft a polite and concise customer quotation for a shipping service based on provided costs. The output MUST be in Thai, starting with "เรียน ลูกค้า...". Use the formal tone for business communication. Do not include a subject line. Format the output with clear line breaks.`;
+            const userQuery = `Draft a quote in Thai. The calculated total shipping cost is ${cost} Baht. The distance is ${distance} km, and the vehicle type used is ${vehicle}. State clearly the total cost and the service scope (transporting goods using a ${vehicle} vehicle over ${distance} km). End the quote professionally.`;
+            
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            try {
+                const response = await fetchWithRetry(apiUrl, payload);
+                const result = await response.json();
+                const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text || "เกิดข้อผิดพลาดในการสร้างใบเสนอราคา";
+                
+                quoteTextEl.textContent = generatedText;
+                quoteOutputDiv.classList.remove('hidden');
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                quoteTextEl.textContent = "ขออภัย, ไม่สามารถสร้างร่างใบเสนอราคาได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง";
+                quoteOutputDiv.classList.remove('hidden');
+            } finally {
+                quoteLoadingEl.classList.add('hidden');
+            }
+        }
+        
+        function copyToClipboard(elementId, button) {
+            const textToCopy = document.getElementById(elementId).textContent;
+            if (!textToCopy) return;
+
+            const tempInput = document.createElement('textarea');
+            tempInput.value = textToCopy;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            button.textContent = 'คัดลอกแล้ว!';
+            setTimeout(() => {
+                button.textContent = 'คัดลอก';
+            }, 2000);
+        }
+
+        window.onload = () => {
+            initializeVehicleOptions();
+            fetchFuelPrice(); 
+        }
+
+    </script>
+</body>
+</html>
